@@ -547,7 +547,7 @@ struct AST_INTERNAL::ProcessGenerator
 	void removeSignalFromCaseTree(const RTLIL::SigSpec &pattern, RTLIL::CaseRule *cs)
 	{
 		for (auto it = cs->actions.begin(); it != cs->actions.end(); it++)
-			it->first.remove2(pattern, &it->second);
+			it->first.remove2(pattern, &it->second);  // FIXME MOST OF THE TIME is spent here ... size 150k then 180k then 200k... this increases ????
 
 		for (auto it = cs->switches.begin(); it != cs->switches.end(); it++)
 			for (auto it2 = (*it)->cases.begin(); it2 != (*it)->cases.end(); it2++)
@@ -610,7 +610,7 @@ struct AST_INTERNAL::ProcessGenerator
 						subst_rvalue_map.set(unmapped_lvalue[i], rvalue[i]);
 				}
 
-				removeSignalFromCaseTree(lvalue, current_case);
+				removeSignalFromCaseTree(lvalue, current_case);  // FIXME MOST OF THE TIME spent within here ?
 				remove_unwanted_lvalue_bits(lvalue, rvalue);
 				current_case->actions.push_back(RTLIL::SigSig(lvalue, rvalue));
 			}

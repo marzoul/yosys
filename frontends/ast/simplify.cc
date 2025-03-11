@@ -1102,7 +1102,7 @@ bool AstNode::simplify(bool const_fold, int stage, int width_hint, bool sign_hin
 		std::set<std::string> existing;
 		int counter = 0;
 		label_genblks(existing, counter);
-		std::map<std::string, AstNode*> this_wire_scope;
+		std::map<std::string, AstNode*> this_wire_scope;  // FIXME Terribly inefficient, use a dictionary of unique strings
 		for (size_t i = 0; i < children.size(); i++) {
 			AstNode *node = children[i];
 
@@ -1748,6 +1748,7 @@ bool AstNode::simplify(bool const_fold, int stage, int width_hint, bool sign_hin
 
 	// simplify all children first
 	// (iterate by index as e.g. auto wires can add new children in the process)
+	size_t num_children_initial = 0;
 	for (size_t i = 0; i < children.size(); i++) {
 		bool did_something_here = true;
 		bool backup_flag_autowire = flag_autowire;
@@ -1797,8 +1798,9 @@ bool AstNode::simplify(bool const_fold, int stage, int width_hint, bool sign_hin
 				did_something = true;
 		}
 		if (stage == 2 && children[i]->type == AST_INITIAL && current_ast_mod != this) {
+			// Note : The simplified child will be removed from local children after, to avoid inefficiency of removing things from std::vector
 			current_ast_mod->children.push_back(children[i]);
-			children.erase(children.begin() + (i--));
+			num_children_initial++;
 			did_something = true;
 		}
 		flag_autowire = backup_flag_autowire;
@@ -1811,6 +1813,16 @@ bool AstNode::simplify(bool const_fold, int stage, int width_hint, bool sign_hin
 			current_memwr_visible = backup_memwr_visible;
 		}
 	}
+	// Remove all children of type INITIAL because these are already transferred to current_ast_mod
+	if (num_children_initial > 0) {
+		size_t new_size = 0;
+		for (size_t i = 0; i < children.size(); i++) {
+			if (children[i]->type != AST_INITIAL)
+				children[new_size++] = children[i];
+		}
+		children.resize(new_size);
+	}
+
 	for (auto &attr : attributes) {
 		while (attr.second->simplify(true, stage, -1, false))
 			did_something = true;
@@ -4141,6 +4153,7 @@ replace_fcall_later:;
 		switch (type)
 		{
 		case AST_IDENTIFIER:
+			// FIXME current_scope[str] : this is computed an enormous amount of times, replace by one reference and reuse it
 			if (current_scope.count(str) > 0 && (current_scope[str]->type == AST_PARAMETER || current_scope[str]->type == AST_LOCALPARAM || current_scope[str]->type == AST_ENUM_ITEM)) {
 				if (current_scope[str]->children[0]->type == AST_CONSTANT) {
 					if (children.size() != 0 && children[0]->type == AST_RANGE && children[0]->range_valid) {
